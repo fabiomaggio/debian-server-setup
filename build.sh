@@ -4,12 +4,11 @@
 # Define system specific variables #
 # ================================ #
 
-USER="fabio"
+USER=""
 TIMEZONE="Europe/Brussels"
-HOSTNAME="scheidingshuis"
-SERVERIP="127.0.0.1"
-DOMAIN="scheidingshuis.be"
-SUBDOMAIN="www.scheidingshuis.be"
+HOSTNAME=""
+DOMAIN=""
+SUBDOMAIN=""
 
 # Update the system
 echo "> Updating the system..."
@@ -17,13 +16,23 @@ apt-get update &&
 apt-get upgrade -y
 echo
 
+# Read system specific variables
+echo "> First, you need to enter a couple of system specific variables"
+echo "> The hostname:"
+read HOSTNAME
+
+echo "> The domain name that will point to the webserver:"
+read DOMAIN
+
+echo "> The subdomain that will be used for the website/app:"
+read SUBDOMAIN
+
 # Set hostname
 echo "${HOSTNAME}" > /etc/hostname
 hostname -F /etc/hostname
-echo
 
 # Update /etc/hosts
-echo "> Updating /etc/hosts..."
+echo -n "> Updating /etc/hosts..."
 mv /etc/hosts /etc/hosts.bak
 echo "
 127.0.0.1       localhost
@@ -35,13 +44,12 @@ ff02::1 ip6-allnodes
 ff02::2 ip6-allrouters
 ff02::3 ip6-allhosts
 " >> /etc/hosts
-echo
+echo "ok"
 
 # Set the timezone
-
-echo "> Setting the timezone to ${TIMEZONE}..."
+echo -n "> Setting the timezone to ${TIMEZONE}..."
 cp /usr/share/zoneinfo/${TIMEZONE} /etc/localtime
-echo
+echo "ok"
 
 # Change root password
 echo "> Change root password"
@@ -55,7 +63,7 @@ echo
 # The user does not exist already
 if [ ! id -u "${USER}" >/dev/null 2>&1 ]; then
     # Add the user
-    echo "> Adding user ${USER} to sudoers..."
+    echo -n "> Adding user ${USER} to sudoers..."
     adduser "${USER}" &&
 
     # Edit the sudoers file via the "visudo" command
@@ -65,6 +73,8 @@ if [ ! id -u "${USER}" >/dev/null 2>&1 ]; then
         export EDITOR=$0
         visudo
     fi
+
+    echo "ok"
 # The user does exist already
 else
     echo "> Skipping creation of ${USER} because it already exists..."
@@ -73,40 +83,37 @@ fi
 echo
 
 # Create /srv directories
-
-echo "> Creating /srv directories..."
+echo -n "> Creating /srv directories..."
 mkdir -p /srv/backup &&
 mkdir -p /srv/www
-echo
+echo "ok"
 
 # Disable root login
-echo "> Disabling root SSH login..."
+echo -n "> Disabling root SSH login..."
 sed -i "s/PermitRootLogin yes/PermitRootLogin no/g" /etc/ssh/sshd_config
-echo
+echo "ok"
 
 # Restart SSH service
-echo "> Restarting SSH service..."
+echo -n "> Restarting SSH service..."
 service ssh restart
-echo
+echo "ok"
 
 # ================== #
 # Configure firewall #
 # ================== #
-
 # Install iptables firewall
-echo "> Installing iptables firewall..."
+echo -n "> Installing iptables firewall..."
 apt-get install -y iptables
-echo
+echo "ok"
 
 # Setup basic rules
-echo "> Setting up basic firewall rules..."
+echo -n "> Setting up basic firewall rules..."
 
 # Flush old rules
 iptables -F
 
 # Allow SSH connections on tcp port 22
 # This is essential when working on remote servers via SSH to prevent locking yourself out of the system
-#
 iptables -A INPUT -p tcp --dport 22 -j ACCEPT
 
 # Set default chain policies
@@ -163,54 +170,53 @@ iptables -A INPUT -j LOGGING
 iptables -I INPUT -m limit --limit 5/min -j LOG --log-prefix "Iptables Dropped Packet: " --log-level 7
 iptables -A LOGGING -j DROP
 
-echo
+echo "ok"
 
 # Install iptables-persistent package
-echo "> Installing iptables-persistent package..."
+echo -n "> Installing iptables-persistent package..."
 apt-get install -y iptables-persistent
+echo "ok"
 
 # Save iptables rules
-echo "> Saving iptables rules..."
+echo  -n "> Saving iptables rules..."
 /etc/init.d/iptables-persistent save
+echo "ok"
 
 # Enable ip_conntrack_ftp module before iptables rules are loaded
 sed --in-place "/rc=0/a  /sbin/modprobe -q i" /etc/init.d/iptables-persistent
-echo
 
 # Install fail2ban package
-echo "> Installing fail2ban package..."
+echo -n "> Installing fail2ban package..."
 apt-get install -y fail2ban
 
 # Backup fail2ban configuration file
 cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
 
 # Change fail2ban configuration file
-sed --in-place "s@ignoreip = 127.0.0.1\/8@ignoreip = 127.0.0.1\/8 ${SERVERIP}@" /etc/fail2ban/jail.local
 sed --in-place "s/bantime = 600/bantime = 3600/" /etc/fail2ban/jail.local
 
-echo
+echo "ok"
 
 # ====== #
 # Apache #
 # ====== #
-
 # Install apache
-echo "> Installing apache2 package..."
+echo -n "> Installing apache2 package..."
 apt-get install -y apache2
-echo
+echo "ok"
 
 # Disable default site
-echo "> Disabling default site..."
+echo -n "> Disabling default site..."
 a2dissite default
-echo
+echo "ok"
 
 # Create website directory
-echo "> Creating website directory structure in /srv/www/${DOMAIN}/${SUBDOMAIN}/..."
+echo -n "> Creating website directory structure in /srv/www/${DOMAIN}/${SUBDOMAIN}/..."
 mkdir -p /srv/www/${DOMAIN}/${SUBDOMAIN}/{public,log,backup}
-echo
+echo "ok"
 
 # Set up virtual hosts
-echo "> Creating VirtualHost for ${DOMAIN}..."
+echo -n "> Creating VirtualHost for ${DOMAIN}..."
 echo "<VirtualHost *:80>
   # Admin email, Server Name (domain name), and any aliases
   ServerAdmin postmaster@${DOMAIN}
@@ -240,42 +246,41 @@ echo "<VirtualHost *:80>
 </VirtualHost>
 " > /etc/apache2/sites-available/${DOMAIN}
 
-echo
+echo "ok"
 
 # Enable site
-echo "> Enabling site ${DOMAIN}, restarting apache..."
+echo -n "> Enabling site ${DOMAIN}, restarting apache..."
 a2ensite ${DOMAIN}
-echo
+echo "ok"
 
 # Enable apache modules
-echo "> Enabling apache modules..."
+echo -n "> Enabling apache modules..."
 a2enmod rewrite
-echo
+echo "ok"
 
 # Disable directory listing
-echo "> Disabling directory listing..."
+echo -n "> Disabling directory listing..."
 a2dismod autoindex
-echo
+echo "ok"
 
 # ===== #
 # MySQL #
 # ===== #
-
 # Install mysql server
-echo "> Installing mysql server..."
+echo -n "> Installing mysql server..."
 apt-get install -y mysql-server && mysql_secure_installation
-echo
+echo "ok"
 
 # === #
 # PHP #
 # === #
 
 # Install php
-echo "> Installing php..."
+echo -n "> Installing php..."
 apt-get install -y php5 php-pear php5-mysql
-echo
+echo "ok"
 
 # Restart apache
-echo "> Restarting apache..."
+echo -n "> Restarting apache..."
 /etc/init.d/apache2 restart
-echo
+echo "ok"
