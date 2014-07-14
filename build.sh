@@ -9,6 +9,7 @@ TIMEZONE="Europe/Brussels"
 HOSTNAME=""
 DOMAIN=""
 SUBDOMAIN=""
+EMAIL=""
 
 # Update the system
 echo "> Updating the system..."
@@ -27,6 +28,9 @@ read DOMAIN
 echo "> The subdomain that will be used for the website/app:"
 read SUBDOMAIN
 
+echo "> The emailaddress that will be used to receive mails of the root user:"
+read EMAIL
+
 # Set hostname
 echo "${HOSTNAME}" > /etc/hostname
 hostname -F /etc/hostname
@@ -44,6 +48,12 @@ ff02::1 ip6-allnodes
 ff02::2 ip6-allrouters
 ff02::3 ip6-allhosts
 " >> /etc/hosts
+echo "ok"
+
+# Update /etc/aliases
+echo -n "> Updating /etc/aliases..."
+echo "root: ${EMAIL}" >> /etc/aliases
+newaliases
 echo "ok"
 
 # Set the timezone
